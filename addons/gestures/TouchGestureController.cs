@@ -54,5 +54,48 @@ namespace Godot.Gestures
     [Export]
     public float MinSwipeDistance { get; private set; } = 200f;
     #endregion
+
+    private readonly ISubject<InputEvent> gestures;
+    private readonly IObservable<RawGesture> state;
+    public TouchGestureController()
+    {
+      var state = new BehaviorSubject<RawGesture>(new RawGesture());
+      this.state = state.AsObservable();
+
+      gestures = new Subject<InputEvent>();
+    }
+
+    public override void _UnhandledInput(InputEvent @event)
+    {
+      base._UnhandledInput(@event);
+      gestures.OnNext(@event);
+    }
+
+    private sealed class Finger
+    {
+      public Vector2 Position { get; }
+      public Finger(Vector2 position)
+      {
+        Position = position;
+      }
+    }
+
+    /// <summary>
+    /// Represents the location of all fingers that are touching the screen
+    /// at some point in time.
+    /// </summary>
+    private sealed class RawGesture
+    {
+      public IReadOnlyDictionary<int, Finger> Fingers { get; }
+      public RawGesture() : this(new Dictionary<int, Finger>())
+      {
+        // Forwarding constructor.
+      }
+
+      public RawGesture(IReadOnlyDictionary<int, Finger> fingers)
+      {
+        Fingers = fingers;
+      }
+    }
   }
 }
