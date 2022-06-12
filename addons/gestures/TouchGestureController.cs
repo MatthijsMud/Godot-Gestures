@@ -101,6 +101,23 @@ namespace Godot.Gestures
       gestures.OnNext(@event);
     }
 
+    private IObservable<(int index, Finger finger)> Tap()
+    {
+      return touches
+      .SelectMany(touch =>
+      {
+        return releases
+        .TakeUntil(Observable.Timer(TimeSpan.FromSeconds(MaxTapDuration)))
+        .TakeUntil(moves.Where(move =>
+        {
+          return (move.index == touch.index)
+          && (MaxTapDistance < (touch.finger.Position - move.finger.Position).Length());
+        }))
+        .Where(release => release.index == touch.index)
+        .Take(1);
+      });
+    }
+
     private sealed class Finger
     {
       public Vector2 Position { get; }
