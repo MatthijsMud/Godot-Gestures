@@ -57,12 +57,42 @@ namespace Godot.Gestures
 
     private readonly ISubject<InputEvent> gestures;
     private readonly IObservable<RawGesture> state;
+    private readonly IObservable<(int index, Finger finger)> touches;
+    private readonly IObservable<(int index, Finger finger)> releases;
+    private readonly IObservable<(int index, Finger finger, Vector2 delta)> moves;
+
     public TouchGestureController()
     {
       var state = new BehaviorSubject<RawGesture>(new RawGesture());
       this.state = state.AsObservable();
 
       gestures = new Subject<InputEvent>();
+
+      moves = gestures
+      .OfType<InputEventScreenDrag>()
+      .Select(@event => (@event.Index, new Finger(@event.Position), @event.Relative))
+      .Publish()
+      .RefCount();
+
+      var fingerPressedStateChanges = gestures
+      .OfType<InputEventScreenTouch>()
+      .GroupBy(@event => @event.Index)
+      .SelectMany(@event => @event.DistinctUntilChanged(@event => @event.Pressed))
+      .Publish()
+      .RefCount();
+
+      touches = fingerPressedStateChanges
+      .Where(@event => @event.Pressed)
+      .Select(@event => (@event.Index, new Finger(@event.Position)))
+      .Publish()
+      .RefCount();
+
+      releases = fingerPressedStateChanges
+      // Note the negation compared to the previous section.
+      .Where(@event => !@event.Pressed)
+      .Select(@event => (@event.Index, new Finger(@event.Position)))
+      .Publish()
+      .RefCount();
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -94,6 +124,9 @@ namespace Godot.Gestures
 
       public RawGesture(IReadOnlyDictionary<int, Finger> fingers)
       {
+        // External code could theoretically modify the dictionary.
+        // As a "private" inner class, this scenario is unlikely; hence no
+        // defensive copy is made.
         Fingers = fingers;
       }
     }
