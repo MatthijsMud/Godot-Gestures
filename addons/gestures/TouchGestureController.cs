@@ -117,6 +117,22 @@ namespace Godot.Gestures
         .Take(1);
       });
     }
+    
+    private IObservable<(int index, Finger finger)> LongPress()
+    {
+      return touches
+      .SelectMany(touch =>
+      {
+        return Observable.Timer(TimeSpan.FromSeconds(MinLongPressDuration))
+        .TakeUntil(releases.Where(release => release.index == touch.index))
+        .TakeUntil(moves.Where(move =>
+        {
+          return (move.index == touch.index)
+          && (MaxTapDistance < (touch.finger.Position - move.finger.Position).Length());
+        }))
+        .Select(_ => touch);
+      });
+    }
 
     private sealed class Finger
     {
