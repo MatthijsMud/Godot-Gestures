@@ -134,6 +134,48 @@ namespace Godot.Gestures
       });
     }
 
+    private IObservable<float> Pinch()
+    {
+      return state
+      .Buffer(2, 1)
+      .Select(pinch =>
+      {
+        var prev = pinch[0];
+        var current = pinch[1];
+        if (prev.Fingers.Count != current.Fingers.Count) return 0;
+
+        return Magnitude(current.Fingers.Values) - Magnitude(prev.Fingers.Values);
+
+        static float Magnitude(IEnumerable<Finger> fingers)
+        {
+          var centroid = Centroid(fingers.Select(finger => finger.Position));
+          return fingers
+          .Select(finger => (centroid - finger.Position).Length())
+          .Sum();
+        }
+      });
+    }
+
+    /// <summary>
+    /// Calculate the "centroid" of the vertices.
+    /// </summary>
+    private static Vector2 Centroid(IEnumerable<Vector2> vertices)
+    {
+      var output = Vector2.Zero;
+      var points = 0;
+      foreach (var vertex in vertices)
+      {
+        output += vertex;
+        ++points;
+      }
+      // Divide by 0 typically doesn't go over too well…
+      if (0 < points)
+      {
+        return output / points;
+      }
+      return Vector2.Zero;
+    }
+    
     private sealed class Finger
     {
       public Vector2 Position { get; }
