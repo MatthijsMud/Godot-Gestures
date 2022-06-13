@@ -156,6 +156,36 @@ namespace Godot.Gestures
       });
     }
 
+    private IObservable<float> Twist()
+    {
+      return state
+      .Buffer(2, 1)
+      .Select(twist =>
+      {
+        var prev = twist[0];
+        var current = twist[1];
+        if (prev.Fingers.Count != current.Fingers.Count) return 0;
+        // Cannot determine the twist of a single finger.
+        if (prev.Fingers.Count < 2) return 0;
+
+        var prevCentroid = Centroid(prev.Fingers.Values.Select(finger => finger.Position));
+        var currentCentroid = Centroid(prev.Fingers.Values.Select(finger => finger.Position));
+        return prev.Fingers.Join(
+          current.Fingers,
+          (value) => value.Key,
+          (value) => value.Key,
+          (prev, current) =>
+          {
+            var prevVector = prev.Value.Position - prevCentroid;
+            var currentVector = current.Value.Position - currentCentroid;
+            // TODO: Wrap number;
+            return -prevVector.AngleTo(currentVector);
+          }
+        )
+        .Average();
+      });
+    }
+    
     /// <summary>
     /// Calculate the "centroid" of the vertices.
     /// </summary>
@@ -175,7 +205,7 @@ namespace Godot.Gestures
       }
       return Vector2.Zero;
     }
-    
+
     private sealed class Finger
     {
       public Vector2 Position { get; }
