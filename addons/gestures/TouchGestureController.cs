@@ -122,14 +122,39 @@ namespace Godot.Gestures
 
       static RawGesture HandleTouch(RawGesture state, InputEventScreenTouch action)
       {
-        
-        return state;
+        if (action.Pressed)
+        {
+          var finger = new Finger(action.Position);
+          var fingers = state.Fingers
+          .Append(new KeyValuePair<int, Finger>(action.Index, finger))
+          .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+          return new RawGesture(fingers);
+        }
+        else
+        {
+          // If the given finger was not tracked, it cannot be removed. 
+          // The state would remain the same in that case.
+          if (!state.Fingers.ContainsKey(action.Index))
+          {
+            return state;
+          }
+          var fingers = state.Fingers
+          .Where(kvp => kvp.Key != action.Index)
+          .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+          return new RawGesture(fingers);
+        }
       }
 
       static RawGesture HandleDrag(RawGesture state, InputEventScreenDrag action)
       {
-
-        return state;
+        var fingers = state.Fingers.Select(kvp => 
+        {
+          return kvp.Key == action.Index
+          ? new KeyValuePair<int, Finger>(kvp.Key, new Finger(action.Position))
+          : kvp;
+        })
+        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        return new RawGesture(fingers);
       }
     }
 
