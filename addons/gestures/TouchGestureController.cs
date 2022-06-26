@@ -63,10 +63,10 @@ namespace Godot.Gestures
 
     public TouchGestureController()
     {
-      var state = new BehaviorSubject<RawGesture>(new RawGesture());
-      this.state = state.AsObservable();
-
       gestures = new Subject<InputEvent>();
+      state = HandleGesture(gestures)
+      .Publish()
+      .RefCount();
 
       moves = gestures
       .OfType<InputEventScreenDrag>()
@@ -99,6 +99,38 @@ namespace Godot.Gestures
     {
       base._UnhandledInput(@event);
       gestures.OnNext(@event);
+    }
+
+    private static IObservable<RawGesture> HandleGesture(IObservable<InputEvent> gestures)
+    {
+      var state = new BehaviorSubject<RawGesture>(new RawGesture());
+      return state
+      .WithLatestFrom(gestures)
+      .Select(tmp => 
+      {
+        var (state, action) = tmp;
+        return action switch
+        {
+          InputEventScreenTouch touch => HandleTouch(state, touch),
+          InputEventScreenDrag drag => HandleDrag(state, drag),
+          _ => state
+        };
+      })
+      .DistinctUntilChanged()
+      .AsObservable();
+
+
+      static RawGesture HandleTouch(RawGesture state, InputEventScreenTouch action)
+      {
+        
+        return state;
+      }
+
+      static RawGesture HandleDrag(RawGesture state, InputEventScreenDrag action)
+      {
+
+        return state;
+      }
     }
 
     private IObservable<(int index, Finger finger)> Tap()
