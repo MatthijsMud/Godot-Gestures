@@ -9,7 +9,11 @@ using System.Reactive.Disposables;
 
 namespace Godot.Gestures
 {
-  sealed class TouchGestureController : Node
+  sealed class TouchGestureController : Node, 
+  ITwistGestureRecognizer, 
+  IPinchGestureRecognizer,
+  ITapGestureRecognizer,
+  ILongPressRecognizer
   {
     #region Settings
 
@@ -61,6 +65,11 @@ namespace Godot.Gestures
     private readonly IObservable<(int index, Finger finger)> releases;
     private readonly IObservable<(int index, Finger finger, Vector2 delta)> moves;
 
+    public IObservable<Twist> Twists { get; }
+    public IObservable<Pinch> Pinches { get; }
+    public IObservable<Tap> Taps { get; }
+    public IObservable<LongPress> LongPresses { get; } 
+
     public TouchGestureController()
     {
       gestures = new Subject<InputEvent>();
@@ -93,6 +102,21 @@ namespace Godot.Gestures
       .Select(@event => (@event.Index, new Finger(@event.Position)))
       .Publish()
       .RefCount();
+
+      Taps = RecognizeTap().Publish().RefCount();
+      LongPresses = RecognizeLongPress().Publish().RefCount();
+      Twists = RecognizeTwist().Publish().RefCount();
+      Pinches = RecognizePinch().Publish().RefCount();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+      if (disposing)
+      {
+        // Indicate we aren't expecting any futher input events.
+        gestures.OnCompleted();
+      }
+      base.Dispose(disposing);
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -158,7 +182,7 @@ namespace Godot.Gestures
       }
     }
 
-    private IObservable<(int index, Finger finger)> Tap()
+    private IObservable<Tap> RecognizeTap()
     {
       return touches
       .SelectMany(touch =>
@@ -171,11 +195,12 @@ namespace Godot.Gestures
           && (MaxTapDistance < (touch.finger.Position - move.finger.Position).Length());
         }))
         .Where(release => release.index == touch.index)
-        .Take(1);
+        .Take(1)
+        .Select(_ => new Tap());
       });
     }
     
-    private IObservable<(int index, Finger finger)> LongPress()
+    private IObservable<LongPress> RecognizeLongPress()
     {
       return touches
       .SelectMany(touch =>
@@ -187,21 +212,24 @@ namespace Godot.Gestures
           return (move.index == touch.index)
           && (MaxTapDistance < (touch.finger.Position - move.finger.Position).Length());
         }))
-        .Select(_ => touch);
+        .Select(_ => new LongPress());
       });
     }
 
-    private IObservable<float> Pinch()
+    private IObservable<Pinch> RecognizePinch()
     {
       return state
       .Buffer(2, 1)
-      .Select(pinch =>
+      .SelectMany(pinch =>
       {
         var prev = pinch[0];
         var current = pinch[1];
-        if (prev.Fingers.Count != current.Fingers.Count) return 0;
+        if (prev.Fingers.Count != current.Fingers.Count) return Observable.Empty<Pinch>();
 
-        return Magnitude(current.Fingers.Values) - Magnitude(prev.Fingers.Values);
+        var position = Centroid(current.Fingers.Values.Select(finger => finger.Position));
+
+        var factor = (Magnitude(current.Fingers.Values) - Magnitude(prev.Fingers.Values), position);
+        return Observable.Return(new Pinch(factor.Item1));
 
         static float Magnitude(IEnumerable<Finger> fingers)
         {
@@ -213,21 +241,21 @@ namespace Godot.Gestures
       });
     }
 
-    private IObservable<float> Twist()
+    private IObservable<Twist> RecognizeTwist()
     {
       return state
       .Buffer(2, 1)
-      .Select(twist =>
+      .SelectMany(twist =>
       {
         var prev = twist[0];
         var current = twist[1];
-        if (prev.Fingers.Count != current.Fingers.Count) return 0;
+        if (prev.Fingers.Count != current.Fingers.Count) return Observable.Empty<Twist>();
         // Cannot determine the twist of a single finger.
-        if (prev.Fingers.Count < 2) return 0;
+        if (prev.Fingers.Count < 2) return Observable.Empty<Twist>();
 
         var prevCentroid = Centroid(prev.Fingers.Values.Select(finger => finger.Position));
         var currentCentroid = Centroid(prev.Fingers.Values.Select(finger => finger.Position));
-        return prev.Fingers.Join(
+        var value = prev.Fingers.Join(
           current.Fingers,
           (value) => value.Key,
           (value) => value.Key,
@@ -240,6 +268,7 @@ namespace Godot.Gestures
           }
         )
         .Average();
+        return Observable.Return(new Twist());
       });
     }
     
@@ -263,6 +292,9 @@ namespace Godot.Gestures
       return Vector2.Zero;
     }
 
+    /// <summary>
+    /// Immutable representation of a "finger" touching the screen.
+    /// </summary>
     private sealed class Finger
     {
       public Vector2 Position { get; }
