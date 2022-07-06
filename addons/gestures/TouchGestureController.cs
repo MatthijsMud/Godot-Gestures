@@ -128,11 +128,11 @@ namespace Godot.Gestures
     private static IObservable<RawGesture> HandleGesture(IObservable<InputEvent> gestures)
     {
       var state = new BehaviorSubject<RawGesture>(new RawGesture());
-      return state
-      .WithLatestFrom(gestures)
+      return gestures
+      .WithLatestFrom(state)
       .Select(tmp => 
       {
-        var (state, action) = tmp;
+        var (action, state) = tmp;
         return action switch
         {
           InputEventScreenTouch touch => HandleTouch(state, touch),
@@ -141,6 +141,7 @@ namespace Godot.Gestures
         };
       })
       .DistinctUntilChanged()
+      .Do(state)
       .AsObservable();
 
 
@@ -228,8 +229,8 @@ namespace Godot.Gestures
 
         var position = Centroid(current.Fingers.Values.Select(finger => finger.Position));
 
-        var factor = (Magnitude(current.Fingers.Values) - Magnitude(prev.Fingers.Values), position);
-        return Observable.Return(new Pinch(factor.Item1));
+        var factor = Magnitude(current.Fingers.Values) - Magnitude(prev.Fingers.Values);
+        return Observable.Return(new Pinch(factor));
 
         static float Magnitude(IEnumerable<Finger> fingers)
         {
