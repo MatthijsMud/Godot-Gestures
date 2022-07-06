@@ -23,7 +23,7 @@ Some devices do not have a means to input any of the [Supported gestures](#suppo
 
 To alleviate this issue somewhat, this project provides alternative means to input certain gestures; Instead relying on mouse clicks/movements, scrolling and some keyboard presses to modify the gestures on the fly.
 
-> :info: **Note:** These emulated gestures aren't a perfect replacement for the ones based on touches. They should however make it possible for more easily creating cross-platform applications with different input methods.
+> :warning: **Warning:** These emulated gestures aren't a perfect replacement for the ones based on touches. They should however make it possible for more easily creating cross-platform applications with different input methods.
 
 ## Supported gestures
 
@@ -82,7 +82,7 @@ Gesture where one finger makes contact with the screen for a very short time, wi
 |-|-|
 | `Index` | Finger which triggered this touch event. |
 | `Position` | Position of the finger that triggered |
-| `Delta` | |
+| `Delta` | Indicates the movement of the finger relative to the previous frame. |
 
 ### Multi-drag
 
@@ -100,8 +100,8 @@ For example: A drawing application that supports zooming in and out might also w
 
 | Property | Description |
 |-|-|
-| `Position` | |
-| `Delta` | | 
+| `Position` | Center of the fingers involved in the gesture. |
+| `Delta` | Indicates the movement of the center relative to the previous frame. | 
 
 ### Pinch
 
@@ -117,8 +117,8 @@ Gesture where two or more fingers either move toward or away from one another. T
 
 | Property | Description |
 |-|-|
-| `Position` | Center of |
-| `Factor` | |
+| `Position` | Center of the fingers involved in the gesture. |
+| `Factor` | Positive numbers indicate the touch positions move away from eachother; negative numbers indicate they move toward eachother.|
 
 
 ### Twist
@@ -135,7 +135,8 @@ Gesture where two or more fingers move in "circles" around a point. This gesture
 
 | Property | Description |
 |-|-|
-| `Position` | Center
+| `Position` | Center of the fingers involved in the gesture. | 
+| `Angle` | Rotation (in radians) | 
 
 
 [rxnet]: https://github.com/dotnet/reactive
