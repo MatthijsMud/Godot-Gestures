@@ -241,6 +241,9 @@ namespace Godot.Gestures
       });
     }
 
+    /// <summary>
+    /// Determine the 
+    /// </summary>
     private IObservable<Twist> RecognizeTwist()
     {
       return state
@@ -249,12 +252,22 @@ namespace Godot.Gestures
       {
         var prev = twist[0];
         var current = twist[1];
+        
+        // Adding/releasing fingers causes the center to shift, yielding a 
+        // rotation that is not accurate.
         if (prev.Fingers.Count != current.Fingers.Count) return Observable.Empty<Twist>();
         // Cannot determine the twist of a single finger.
         if (prev.Fingers.Count < 2) return Observable.Empty<Twist>();
 
+        // Determine the point around which the fingers rotate. Account for 
+        // movement of the center as a result of sloppy user input by 
+        // calculating the previous and current center. Not doing so could
+        // yield weird angles.
         var prevCentroid = Centroid(prev.Fingers.Values.Select(finger => finger.Position));
         var currentCentroid = Centroid(prev.Fingers.Values.Select(finger => finger.Position));
+
+        // Pair the current position of each finger with their previous position
+        // to determine how much it has rotated around the center.
         var value = prev.Fingers.Join(
           current.Fingers,
           (value) => value.Key,
@@ -264,11 +277,12 @@ namespace Godot.Gestures
             var prevVector = prev.Value.Position - prevCentroid;
             var currentVector = current.Value.Position - currentCentroid;
             // TODO: Wrap number;
-            return -prevVector.AngleTo(currentVector);
+            return currentVector.AngleTo(prevVector);
           }
         )
+        // Prevent things from rotating faster if more fingers are involved.
         .Average();
-        return Observable.Return(new Twist());
+        return Observable.Return(new Twist(value));
       });
     }
     

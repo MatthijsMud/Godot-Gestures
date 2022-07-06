@@ -12,6 +12,12 @@ namespace Godot.Gestures
   ILongPressRecognizer,
   ITapGestureRecognizer
   {
+    /// <summary>
+    /// Amount 
+    /// </summary>
+    [Export]
+    public float PinchFactor { get; private set; } = 1f;
+
     private readonly ISubject<InputEvent> gestures;
     public IObservable<Twist> Twists { get; }
     public IObservable<Pinch> Pinches { get; }
@@ -21,6 +27,10 @@ namespace Godot.Gestures
     public EmulateGestureController()
     {
       gestures = new Subject<InputEvent>();
+
+      Twists = Observable.Empty<Twist>();
+      Taps = Observable.Empty<Tap>();
+      LongPresses = Observable.Empty<LongPress>();
 
       Pinches = gestures
       .OfType<InputEventMouseButton>()
@@ -34,16 +44,12 @@ namespace Godot.Gestures
       })
       .Select(@event => new Pinch((ButtonList)@event.ButtonIndex switch 
       {
-        ButtonList.WheelUp => 1f,
-        ButtonList.WheelDown => -1f,
+        ButtonList.WheelUp => PinchFactor,
+        ButtonList.WheelDown => -PinchFactor,
         _ => 0 // Should not happen based on the above filtering!
       }))
       .Publish()
       .RefCount();
-
-      Twists = Observable.Empty<Twist>();
-      Taps = Observable.Empty<Tap>();
-      LongPresses = Observable.Empty<LongPress>();
     }
 
     public override void _Ready()
