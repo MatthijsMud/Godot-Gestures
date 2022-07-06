@@ -29,33 +29,70 @@ namespace Godot.Gestures
       var compound = new CompositeDisposable();
       foreach (var child in GetChildren())
       {
-        var tapper = child as ITapGestureRecognizer;
-        tapper?.Taps
-        .Do(tap => { Input.ParseInputEvent(new InputEventSingleScreenTap()); })
-        .Subscribe();
-
-        var longPresser = child as ILongPressRecognizer;
-        longPresser?.LongPresses
-        .Do(longPress => {Input.ParseInputEvent(new InputEventSingleScreenLongPress()); })
-        .Subscribe();
-
-        var pincher = child as IPinchGestureRecognizer;
-        var pinches = pincher?.Pinches
-        .Do(pinch => {
-          Input.ParseInputEvent(new InputEventScreenPinch{
-            Factor = pinch.Factor,
-          }); 
-        })
-        .Subscribe();
-        if (pinches != null) compound.Add(pinches);
-
-        var twister = child as ITwistGestureRecognizer;
-        twister?.Twists
-        .Do(twist => { Input.ParseInputEvent(new InputEventScreenTwist()); })
-        .Subscribe();
+        if (SubscribeToSource(child) is IDisposable subscriptions)
+        {
+          compound.Add(subscriptions);
+        }
       }
     }
 
-  }
+    private IDisposable? SubscribeToSource(object? source)
+    {
+      if (source == null) return null;
 
+      var potentialSubscriptions = new Func<object?, IDisposable?>[]
+      {
+        HandleTaps,
+        HandleLongPresses,
+        HandlePinches,
+        HandleTwists,
+      };
+
+      var subscriptions = new CompositeDisposable();
+
+      foreach (var subscribeTo in potentialSubscriptions)
+      {
+        if (subscribeTo(source) is IDisposable subscription)
+        {
+          subscriptions.Add(subscription);
+        }
+      }
+
+      return subscriptions;
+    }
+
+    private IDisposable? HandleTaps(object? source)
+    {
+      return (source as ITapGestureRecognizer)?.Taps
+      .Do(tap => { Input.ParseInputEvent(new InputEventSingleScreenTap()); })
+      .Subscribe();
+    }
+
+    private IDisposable? HandleLongPresses(object? source)
+    {
+      return (source as ILongPressRecognizer)?.LongPresses
+      .Do(longPress => { Input.ParseInputEvent(new InputEventSingleScreenLongPress()); })
+      .Subscribe();
+    }
+
+    private IDisposable? HandlePinches(object? source)
+    {
+      return (source as IPinchGestureRecognizer)?.Pinches
+      .Do(pinch =>
+      {
+        Input.ParseInputEvent(new InputEventScreenPinch
+        {
+          Factor = pinch.Factor,
+        });
+      })
+      .Subscribe();
+    }
+
+    private IDisposable? HandleTwists(object? source)
+    {
+      return (source as ITwistGestureRecognizer)?.Twists
+      .Do(twist => { Input.ParseInputEvent(new InputEventScreenTwist()); })
+      .Subscribe();
+    }
+  }
 }
