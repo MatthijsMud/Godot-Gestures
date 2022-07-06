@@ -21,7 +21,6 @@ namespace Godot.Gestures.Editor
     public override void _EnterTree()
     {
       base._EnterTree();
-      GD.Print("C# Plugin");
       foreach(var inspector in customInspectors)
       {
         AddInspectorPlugin(inspector);
